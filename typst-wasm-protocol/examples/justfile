@@ -1,0 +1,38 @@
+set windows-powershell := true
+
+target := "wasm32-unknown-unknown"
+profile := "release"
+wasm := "examples.wasm"
+out := "examples.pdf"
+wasm_src := if os_family() == "windows" { "..\\..\\target\\wasm32-unknown-unknown\\release\\examples.wasm" } else { "../../target/wasm32-unknown-unknown/release/examples.wasm" }
+copy_wasm := if os_family() == "windows" { "Copy-Item -Force" } else { "cp" }
+clean_wasm := if os_family() == "windows" { "Remove-Item -ErrorAction SilentlyContinue examples.wasm" } else { "rm -f examples.wasm" }
+clean_out := if os_family() == "windows" { "Remove-Item -ErrorAction SilentlyContinue examples.pdf" } else { "rm -f examples.pdf" }
+
+default: build
+
+# Install the Rust target needed to build Typst plugins.
+target:
+    rustup target add {{target}}
+
+# Build the example plugin and copy the wasm next to the Typst files.
+build: target
+    cargo build -p examples --target {{target}} --{{profile}}
+    {{copy_wasm}} "{{wasm_src}}" "{{wasm}}"
+
+# Compile the Typst demo document.
+typst: build
+    typst compile "examples.typ" "{{out}}"
+
+# Run Rust checks for the workspace.
+check:
+    cargo check --workspace
+
+# Format the Rust workspace.
+fmt:
+    cargo fmt --all
+
+# Remove generated example artifacts.
+clean:
+    {{clean_wasm}}
+    {{clean_out}}

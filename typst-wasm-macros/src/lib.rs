@@ -8,6 +8,7 @@ fn construct_export(
     vis_marker: Option<VisMarker>,
     params: Vec<FnTypedParam>,
     export_rename: &Option<Expr>,
+    cbor: bool,
 ) -> proc_macro2::TokenStream {
     fn param_idx(name: &proc_macro2::Ident) -> proc_macro2::Ident {
         format_ident!("__{}_idx", name)
@@ -39,6 +40,12 @@ fn construct_export(
         )
     };
 
+    let send_result = if cbor {
+        quote!(typst_wasm_protocol::send_cbor_result)
+    } else {
+        quote!(typst_wasm_protocol::PluginResult::send_result)
+    };
+
     let mut set_args = quote!(
         let mut start: usize = 0;
     );
@@ -46,8 +53,16 @@ fn construct_export(
         let name = &param.name;
         let ty = &param.ty;
         let idx = param_idx(name);
+        let decode_arg = if cbor {
+            quote!(<#ty as typst_wasm_protocol::PluginCborArg>::from_cbor_arg)
+        } else {
+            quote!(<#ty as typst_wasm_protocol::PluginArg>::from_arg)
+        };
         set_args.extend(quote!(
-            let #name: #ty = (&__unsplit_params[start..start + #idx]).into();
+            let #name: #ty = match #decode_arg(&__unsplit_params[start..start + #idx]) {
+                Ok(value) => value,
+                Err(err) => return typst_wasm_protocol::send_error(err),
+            };
             start += #idx;
         ));
     }
@@ -59,7 +74,7 @@ fn construct_export(
             #set_args
 
             let result = #name(#(#param_names),*);
-            typst_wasm_protocol::PluginResult::send_result(result)
+            #send_result(result)
         }
     )
     .into()
@@ -67,21 +82,27 @@ fn construct_export(
 
 struct MacroOptions {
     pub export_rename: Option<Expr>,
+    pub cbor: bool,
 }
 
 #[proc_macro_attribute]
 pub fn wasm_export(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = syn::punctuated::Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated
+    let args = syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated
         .parse(args)
         .expect("invalid arguments");
 
     let mut options = MacroOptions {
         export_rename: None,
+        cbor: false,
     };
     for arg in args {
-        let syn::MetaNameValue { path, value, .. } = arg;
-        match path.get_ident().expect("invalid argument") {
-            x if x == "export_rename" => {
+        match arg {
+            syn::Meta::Path(path) if path.is_ident("cbor") => {
+                options.cbor = true;
+            }
+            syn::Meta::NameValue(syn::MetaNameValue { path, value, .. })
+                if path.is_ident("export_rename") =>
+            {
                 options.export_rename = Some(value);
             }
             _ => panic!("invalid argument"),
@@ -133,6 +154,7 @@ pub fn wasm_export(args: TokenStream, item: TokenStream) -> TokenStream {
             vis_marker,
             p,
             &options.export_rename,
+            options.cbor,
         ));
     }
     result.into()

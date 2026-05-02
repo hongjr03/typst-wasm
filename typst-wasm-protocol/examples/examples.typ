@@ -1,24 +1,29 @@
-// Should compile example.wasm first
-#import plugin("examples.wasm"): to_uppercase, count_chars, divide_numbers, validate_email
+// Build first:
+// cargo build -p examples --target wasm32-unknown-unknown --release
+// Then copy or reference the generated wasm as `examples.wasm` next to this file.
+
+#import "examples-wrapper.typ": *
+
+= typst-wasm-protocol example
+
+== Plain text and number exports
 
 #let input = "Hello, Typst!"
 
-// Call the to_uppercase function
-#let uppercase = str(to_uppercase(bytes(input)))
 Original: #input\
-Uppercase: #uppercase
+Uppercase: #to-uppercase(input)\
+#count-chars(input)\
+10 + 32 = #add(10, 32)\
+#divide-numbers(10, 2)\
+Email validation: #validate-email("user@example.com")
 
-// Call the count_chars function (note this is exported with a custom name)
-#let char_count = str(count_chars(bytes(input)))
-#char_count
+// Uncomment to see protocol error handling from `Result::Err`:
+// #divide-numbers(10, 0)
 
-// Call a function that returns a Result type
-#let division_result = str(divide_numbers(bytes("10,2")))
-#division_result
+== CBOR structured exports
 
-// Handle potential errors, uncomment to see the error handling in action
-// #let division_error = divide_numbers(bytes("10,0"))
+#let greeting = greet-person((name: "Ada", age: 36))
 
-// Use a function with Result<String, String> type
-#let email_valid = str(validate_email(bytes("user@example.com")))
-Email validation: #email_valid
+Greeting message: #greeting.message\
+Adult: #greeting.adult\
+Sum list: #sum-list((1, 2, 3, 4, 5))

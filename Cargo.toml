@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["typst-wasm-macros", "typst-wasm-protocol"]
+members = ["typst-wasm-macros", "typst-wasm-protocol", "typst-wasm-protocol/examples"]
 default-members = ["typst-wasm-protocol"]
 
 [workspace.package]
@@ -14,7 +14,9 @@ description = "Typst WASM tools"
 typst-wasm-macros = { path = "./typst-wasm-macros", version = "0.0.2" }
 typst-wasm-protocol = { path = "./typst-wasm-protocol", version = "0.0.2" }
 
+ciborium = "0.2"
 proc-macro2 = "1.0.36"
 quote = "1.0.15"
+serde = "1"
 syn = "2.0.99"
 venial = "0.6.1"
